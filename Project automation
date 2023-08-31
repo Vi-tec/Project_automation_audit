@@ -1,0 +1,60 @@
+import paramiko
+import os
+import pandas as pd
+import win32com.client as win32
+
+
+# Initialize SSH client for internal network
+internal_ssh = paramiko.SSHClient()
+internal_ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+internal_ssh.connect("internal_host", username="internal_username", password="internal_password")
+
+# Initialize SFTP for internal network
+internal_sftp = internal_ssh.open_sftp()
+
+# Initialize SSH client for cloud storage
+cloud_ssh = paramiko.SSHClient()
+cloud_ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+cloud_ssh.connect("cloud_host", username="cloud_username", password="cloud_password")
+
+# Initialize SFTP for cloud storage
+cloud_sftp = cloud_ssh.open_sftp()
+
+# List files from cloud and internal storage
+cloud_files = cloud_sftp.listdir("/cloud_path/")
+internal_files = internal_sftp.listdir("/internal_path/")
+
+# Transfer non-duplicate files from cloud to internal
+for file in cloud_files:
+    if file not in internal_files:
+        cloud_sftp.get(f"/cloud_path/{file}", f"/internal_path/{file}")
+
+# Check for missing audit requirement files, this part must be heavily modified since not always are files uploaded under same name by the Client
+df = pd.read_excel("audit_requirements.xlsx")  # Make sure this file exists
+required_files = df['FileName'].tolist()
+missing_files = [file for file in required_files if file not in internal_files]
+
+# Write missing files to Excel
+if missing_files:
+    df_missing = pd.DataFrame({'MissingFiles': missing_files})
+    df_missing.to_excel("missing_files.xlsx", index=False)
+
+# Create function to connect to Outlook (previous login must be established)
+def create_outlook_draft(missing_files):
+    outlook = win32.Dispatch('outlook.application')
+    mail = outlook.CreateItem(0)  # 0 is for drafts
+    mail.Subject = 'List of Missing Files'
+    mail.Body = 'Dear Client,\n\nPlease upload the following missing files:\n' + "\n".join(missing_files)
+    mail.Save()
+
+
+# Write missing files to Excel and send email draft
+if missing_files:
+    df_missing = pd.DataFrame({'MissingFiles': missing_files})
+    df_missing.to_excel("missing_files.xlsx", index=False)
+    create_outlook_draft(missing_files)
+
+internal_sftp.close()
+internal_ssh.close()
+cloud_sftp.close()
+cloud_ssh.close()
