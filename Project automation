@@ -44,7 +44,7 @@ def create_outlook_draft(missing_files):
     outlook = win32.Dispatch('outlook.application')
     mail = outlook.CreateItem(0)  # 0 is for drafts
     mail.Subject = 'List of Missing Files'
-    mail.Body = 'Dear Client,\n\nPlease upload the following missing files:\n' + "\n".join(missing_files)
+    mail.Body = 'Dobrý den,\n\nProsíme o zaslání následujících dokumentů:\n' + "\n".join(missing_files)
     mail.Save()
 
 
